@@ -3,12 +3,13 @@ import cv2 as cv
 import argparse
 
 ## https://docs.opencv.org/3.4/d4/dee/tutorial_optical_flow.html
-parser = argparse.ArgumentParser(description='This sample demonstrates Lucas-Kanade Optical Flow calculation. \
-                                              The example file can be downloaded from: \
-                                              https://www.bogotobogo.com/python/OpenCV_Python/images/mean_shift_tracking/slow_traffic_small.mp4')
-parser.add_argument('image', type=str, help='path to image file')
-args = parser.parse_args()
-cap = cv.VideoCapture(args.image)
+# parser = argparse.ArgumentParser(description='This sample demonstrates Lucas-Kanade Optical Flow calculation. \
+#                                               The example file can be downloaded from: \
+#                                               https://www.bogotobogo.com/python/OpenCV_Python/images/mean_shift_tracking/slow_traffic_small.mp4')
+# parser.add_argument('image', type=str, help='path to image file')
+# args = parser.parse_args()
+# cap = cv.VideoCapture(args.image)
+cap = cv.VideoCapture('ExampleVideo.avi')
 # params for ShiTomasi corner detection
 feature_params = dict( maxCorners = 100,
                        qualityLevel = 0.3,
@@ -43,10 +44,10 @@ while(1):
         a, b = new.ravel()
         c, d = old.ravel()
         mask = cv.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
-        frame = cv.circle(frame, (int(a), int(b)), 5, color[i].tolist(), -1)
+        frame = cv.circle(frame, (int(a), int(b)), 2, color[i].tolist(), -1)
     img = cv.add(frame, mask)
     cv.imshow('frame', img)
-    k = cv.waitKey(30) & 0xff
+    k = cv.waitKey(3000) & 0xff
     if k == 27:
         break
     # Now update the previous frame and previous points

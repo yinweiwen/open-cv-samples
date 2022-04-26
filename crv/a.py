@@ -4,124 +4,117 @@ import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
 
-videoReader=cv.VideoCapture('ExampleVideo.avi')
+videoReader = cv.VideoCapture('ExampleVideo.avi')
 
 # Find OpenCV version
 (major_ver, minor_ver, subminor_ver) = (cv.__version__).split('.')
-
-# With webcam get(CV_CAP_PROP_FPS) does not work.
-# Let's see for ourselves.
-
-if int(major_ver)  < 3 :
+if int(major_ver) < 3:
     fps = videoReader.get(cv.cv.CV_CAP_PROP_FPS)
+    N = videoReader.get(cv.cv.CV_CAP_PROP_FRAME_COUNT)
     print("Frames per second using video.get(cv2.cv.CV_CAP_PROP_FPS): {0}".format(fps))
-else :
+else:
     fps = videoReader.get(cv.CAP_PROP_FPS)
+    N = videoReader.get(cv.CAP_PROP_FRAME_COUNT)
     print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
 
-
-ret,frame=videoReader.read()
+ret, frame = videoReader.read()
 if not ret:
-    sys.exit(1);
-
-# https://www.codegrepper.com/code-examples/python/python+opencv+draw+rectangle
-# gray=cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
-# Adding Function Attached To Mouse Callback
-drawing = False
-ix = 0
-iy = 0
-def draw(event,x,y,flags,params):
-    global ix,iy,drawing
-    # Left Mouse Button Down Pressed
-    if(event==cv.EVENT_LBUTTONDOWN):
-        print("a")
-        drawing = True
-        ix = x
-        iy = y
-    if(event==cv.EVENT_MOUSEMOVE):
-        if(drawing==True):
-            print("from {0},{1} to {2},{3}".format(ix,iy,x,y))
-            #For Drawing Line
-            # cv.line(frame,pt1=(ix,iy),pt2=(x,y),color=(255,255,255),thickness=3)
-            # For Drawing Rectangle
-            cv.rectangle(frame,pt1=(ix,iy),pt2=(x,y),color=(0,0,255),thickness=3)
-    if(event==cv.EVENT_LBUTTONUP):
-        cv.imshow("cap",frame)
-        drawing = False
-
-cv.imshow("cap",frame)
-# Adding Mouse CallBack Event
-cv.setMouseCallback("cap",draw)
-
-# todo fix here
-# from 603,205 to 734,299
+    sys.exit(1)
 
 # detect mask 参数
 # https://www.ccoderun.ca/programming/doxygen/opencv/classcv_1_1ORB.html#aa4e9a7082ec61ebc108806704fbd7887
-mask=np.zeros(frame.shape[:2], dtype=np.uint8)
-cv.rectangle(mask,(603,205),(734,299),255,-1)
+mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+cv.rectangle(mask, (801,204), (892, 284), 255, -1)
 
-gray=cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
-# Initiate ORB detector
-orb = cv.ORB_create()
-# find the keypoints with ORB
-kp = orb.detect(gray,mask=mask)
-# compute the descriptors with ORB
-kp, des = orb.compute(gray, kp)
-# draw only keypoints location,not size and orientation
-img2 = cv.drawKeypoints(gray, kp, None, color=(0,255,0), flags=0)
-plt.imshow(img2), plt.show()
+# 点位捕获
+# params for ShiTomasi corner detection
+feature_params = dict(maxCorners=100,
+                      qualityLevel=0.3,
+                      minDistance=7,
+                      blockSize=7)
+# Parameters for lucas kanade optical flow
+lk_params = dict(winSize=(15, 15),
+                 maxLevel=2,
+                 criteria=(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 0.03))
+# Create some random colors
+color = np.random.randint(0, 255, (100, 3))
+# Take first frame and find corners in it
+old_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+p0 = cv.goodFeaturesToTrack(old_gray, mask=mask, **feature_params)
+# Create a mask image for drawing purposes
+mask = np.zeros_like(frame)
+N = int(N)
+print('Total Frame Count:{0}'.format(N))
 
-tracker_type='KCF'
-if tracker_type == 'BOOSTING':
-    tracker = cv.TrackerBoosting_create()
-if tracker_type == 'MIL':
-    tracker = cv.TrackerMIL_create()
-if tracker_type == 'KCF':
-    tracker = cv.TrackerKCF_create()
-if tracker_type == 'TLD':
-    tracker = cv.TrackerTLD_create()
-if tracker_type == 'MEDIANFLOW':
-    tracker = cv.TrackerMedianFlow_create()
-if tracker_type == 'GOTURN':
-    tracker = cv.TrackerGOTURN_create()
-if tracker_type == 'MOSSE':
-    tracker = cv.TrackerMOSSE_create()
-if tracker_type == "CSRT":
-    tracker = cv.TrackerCSRT_create()
+# numpy matlab 函数对比https://numpy.org/doc/stable/user/numpy-for-matlab-users.html
+print(p0.shape[0])
+pos = np.zeros((N, p0.shape[0], 2))
+pos[0] = p0[:, 0, :]
+i = 0
+while 1:
+    i += 1
+    ret, frame = videoReader.read()
+    if not ret:
+        print('No frames grabbed!')
+        break
+    frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    # calculate optical flow
+    p1, st, err = cv.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
+    # Select good points
+    if p1 is not None:
+        good_new = p1[st == 1]
+        good_old = p0[st == 1]
+        pos[i] = good_new
+    else:
+        continue
+    # draw the tracks
+    # for i, (new, old) in enumerate(zip(good_new, good_old)):
+    #     a, b = new.ravel()
+    #     c, d = old.ravel()
+    #     frame = cv.circle(frame, (int(a), int(b)), 2, color[i].tolist(), -1)
+    # cv.imshow('frame', frame)
+    # k = cv.waitKey(10) & 0xff
+    # if k == 27:
+    #     break
 
-tracker.init(frame,kp)
-while True:
-    ok, frame = videoReader.read()
-    if not ok:
-        break;
+    # Now update the previous frame and previous points
+    old_gray = frame_gray.copy()
+    p0 = good_new.reshape(-1, 1, 2)
 
-    ok,bbox=tracker.update(frame)
-    print(bbox)
-    # # Draw bounding box
-    if ok:
-        # Tracking success
-        p1 = (int(bbox[0]), int(bbox[1]))
-        p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-        cv.rectangle(frame, p1, p2, (255,0,0), 2, 1)
-    else :
-        # Tracking failure
-        cv.putText(frame, "Tracking failure detected", (100,80), cv.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+Disp2D=pos-pos[np.zeros(N,dtype=np.uint8),:,:]
+t=np.arange(1.,N+1.)/fps
+print(Disp2D)
 
-    # Display tracker type on frame
-    cv.putText(frame, tracker_type + " Tracker", (100,20), cv.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50),2);
+fig, (ax1, ax2) = plt.subplots(2, sharex=True)
+fig.suptitle('Time Serial Pixels Change')
+ax1.plot(t, Disp2D[:,:,0].squeeze(),linewidth=0.5,label='Disp(X)[px]')
+ax2.plot(t, Disp2D[:,:,1].squeeze(),linewidth=0.5,label='Disp(Y)[px]')
 
-    # Display FPS on frame
-    cv.putText(frame, "FPS : " + str(int(fps)), (100,50), cv.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2);
+print(Disp2D)
+plt.show()
 
-    # Display result
-    cv.imshow("Tracking", frame)
+Disp2D_ave=np.mean(Disp2D,axis=1)
+fig, (ax1, ax2) = plt.subplots(2, sharex=True)
+fig.suptitle('Time Serial Pixels MEAN')
+ax1.plot(t, Disp2D_ave[:,0],linewidth=0.5,label='Mean.Disp(X)[px]')
+ax2.plot(t, Disp2D_ave[:,1],linewidth=0.5,label='Mean.Disp(Y)[px]')
+print(Disp2D_ave)
+plt.show()
 
-    # Exit if ESC pressed
-    k = cv.waitKey(1000) & 0xff
-    if k == 27 : break
+# todo fft
 
-k = cv.waitKey(0)
+# 像素转位移
+#l = drawline; ##matlab
+# estimate the scaling factor
+line=np.array([[34 ,249],[847,  245]])
+dist_px=line[1,1]-line[0,1]
+dist_m=2.
+px2m = dist_m/dist_px
+# apply scale
+Disp_m = px2m * Disp2D_ave
+plt.title('Vertical Distance(m)')
+plt.plot(t, -Disp_m[:,1],linewidth=0.5,label='Vert.Disp[m]')
+plt.show()
 
 videoReader.release()
 cv.destroyAllWindows()
