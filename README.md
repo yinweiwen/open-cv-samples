@@ -1,4 +1,10 @@
+# Python Open-CV Samples
 
+ ![](imgs/README/badge.svg)
+
+通过`open-cv`特征点识别和对点位追踪实现对监测对象位移量的计算。
+
+---
 
 ## Matlab
 
